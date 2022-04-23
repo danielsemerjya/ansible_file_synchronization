@@ -1,58 +1,12 @@
 ---
 # TODO: implement synchronization logic
-- name: Create group 'remote_servers'
-  hosts: all
-  tasks:
-    - name: Add host
-      add_host: 
-        hostname: "{{ item }}"
-        groups: remote_servers
-      with_inventory_hostnames:
-        - all
-      run_once: true
+- name: Create group for remote servers.
+  import_playbook: playbooks/create_group.yml
 
-- name: Check is "File To Sync" in any remote machine
-  hosts: all
-  serial: 1
-  pre_tasks:
-    - assert:
-        that:
-          - fileToSync is defined
+- name: Look for "File To Sync" on romote servers.
+  import_playbook: playbooks/check_is_file_exists.yml
 
-  tasks:
-    - name: Get stat of "File To Sync"
-      stat:
-        path: "{{ fileToSync }}"
-      register: stat
-
-    - name: Set information about fileToSync presence
-      set_fact:
-        file_presence: true
-      when: stat.stat.exists == true
-
-    - name: Set information about file absence
-      set_fact:
-        file_presence: false
-      when: stat.stat.exists == false
-
-    # - name: Delegate information about founded fileToSync to DUMMY
-    #   set_fact:
-    #     file_founded: true
-    #     file_holder_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | string }}"
-    #   delegate_to: DUMMY
-    #   when: stat.stat.exists == true
-
-    - name: Add dummy host for variable holding
-      add_host:
-        name: "DUMMY_HOLDER"
-        file_holder_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | string }}"
-      when: stat.stat.exists == true
-
-    - debug:
-        msg: " FIRST : {{ hostvars['DUMMY_HOLDER']['file_holder_ip'] }} "
-      when: stat.stat.exists == true
-
-- name: Assert that "File To Sync" was founded 
+- name: Assert that "File To Sync" was founded.
   hosts: localhost
   gather_facts: false
   tasks:
@@ -62,48 +16,14 @@
         fail_msg: '"File To Sync" was not founded on any host.'
         success_msg: '"File To Sync" was founded.'
 
-    # - debug:
-    #     msg: " THIS IS WHERE FileToSync ARE STORED: {{ hostvars['DUMMY_HOLDER']['file_holder_ip'] }} "
+- name: Enable ssh on remote servers
+  import_playbook: playbooks/enable_ssh.yml
 
-- name: Generate SSH keys
-  hosts: remote_servers
-  serial: 1
-  gather_facts: true
-  tasks:
-    - name: SSH KeyGen command
-      shell: > 
-        ssh-keygen -q -b 2048 -t rsa -N "" -C "creating SSH" -f ~/.ssh/id_rsa
-        creates="~/.ssh/id_rsa"
-
-    - name: Fetch the keyfile from the node to master
-      fetch: 
-        src: "~/.ssh/id_rsa.pub"
-        dest: "{{ playbook_dir }}/tmp/buffer/{{inventory_hostname}}-id_rsa.pub"
-        validate_checksum: false
-        flat: true
-
-- name: Exchange SSH Keys between servers
+- name: Synchronize.
   hosts: remote_servers
   gather_facts: true
   tasks:
-    - name: Add keys to authorized_keys
-      authorized_key:
-        user: root
-        state: present
-        key: "{{ lookup('file','{{ playbook_dir }}/tmp/buffer/{{item}}-id_rsa.pub')}}"
-      when: "{{ item != inventory_hostname }}"
-      with_items: 
-        - "{{ groups['remote_servers'] }}"
-        
-    - name: Restart sshd
-      shell:
-        cmd: "/etc/init.d/sshd restart"
-
-- name: Synchronize 
-  hosts: remote_servers
-  gather_facts: true
-  tasks:
-    - name: Generic question with multiple different responses
+    - name: Generic question with multiple different responses.
       remote_user: root
       expect:
         command: "rsync -avzh root@{{ hostvars['DUMMY_HOLDER']['file_holder_ip'] | string }}:{{ fileToSync }} {{ fileToSync }}"

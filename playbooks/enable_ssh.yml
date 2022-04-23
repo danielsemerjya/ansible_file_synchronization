@@ -1,0 +1,34 @@
+---
+- name: Generate SSH keys.
+  hosts: remote_servers
+  serial: 1
+  gather_facts: true
+  tasks:
+    - name: SSH KeyGen command.
+      shell: > 
+        ssh-keygen -q -b 2048 -t rsa -N "" -C "creating SSH" -f ~/.ssh/id_rsa
+        creates="~/.ssh/id_rsa"
+
+    - name: Fetch the keyfile from the node to master.
+      fetch: 
+        src: "~/.ssh/id_rsa.pub"
+        dest: "{{ playbook_dir }}/tmp/buffer/{{inventory_hostname}}-id_rsa.pub"
+        validate_checksum: false
+        flat: true
+
+- name: Exchange SSH Keys between servers.
+  hosts: remote_servers
+  gather_facts: true
+  tasks:
+    - name: Add keys to authorized_keys.
+      authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file','{{ playbook_dir }}/tmp/buffer/{{item}}-id_rsa.pub')}}"
+      when: "{{ item != inventory_hostname }}"
+      with_items: 
+        - "{{ groups['remote_servers'] }}"
+        
+    - name: Restart sshd.
+      shell:
+        cmd: "/etc/init.d/sshd restart"

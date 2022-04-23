@@ -1,0 +1,11 @@
+---
+- name: Create group 'remote_servers'.
+  hosts: all
+  tasks:
+    - name: Add host.
+      add_host: 
+        hostname: "{{ item }}"
+        groups: remote_servers
+      with_inventory_hostnames:
+        - all
+      run_once: true

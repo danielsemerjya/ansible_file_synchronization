@@ -26,7 +26,9 @@ RUN ["rsync", "--daemon"]
 RUN echo "root:root" | chpasswd
 
 EXPOSE 22
-EXPOSE 873
+# EXPOSE 873
+
+# rsync -avzh root@172.17.0.3:/tmp/foo /tmp/foo
 
 # rsync -avzh root@172.17.0.2:/tmp/foo /tmp/foo
 

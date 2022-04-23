@@ -1,0 +1,29 @@
+---
+- name: Check is "File To Sync" in any remote machine.
+  hosts: all
+  serial: 1
+  pre_tasks:
+    - assert:
+        that:
+          - fileToSync is defined
+  tasks:
+    - name: Get stat of "File To Sync".
+      stat:
+        path: "{{ fileToSync }}"
+      register: stat
+
+    - name: Set information about fileToSync presence.
+      set_fact:
+        file_presence: true
+      when: stat.stat.exists == true
+
+    - name: Set information about fileToSync absence.
+      set_fact:
+        file_presence: false
+      when: stat.stat.exists == false
+
+    - name: Add dummy host for variable holding.
+      add_host:
+        name: "DUMMY_HOLDER"
+        file_holder_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | string }}"
+      when: stat.stat.exists == true
