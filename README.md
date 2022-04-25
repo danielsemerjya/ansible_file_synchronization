@@ -1,7 +1,3 @@
-# Introduction
-
-This is a test problem, that will test your knowledge of Python, Ansible and Docker.
-
 # Story
 
 We have multiple machines in a cluster. 
