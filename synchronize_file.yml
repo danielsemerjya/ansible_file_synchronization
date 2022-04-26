@@ -9,6 +9,7 @@
     - assert:
         that:
           - fileToSync is defined
+      run_once: true
 
     - name: Add dummy host for variable holding.
       add_host:
@@ -30,20 +31,20 @@
         file_presence: true
       when: stat_exec.stat.exists == true
 
-    - name: Set information about fileToSync presence to DUMMY_HOLDER.
-      set_fact:
-        file_founded_somewhere: true
-      delegate_to: DUMMY_HOLDER
-      delegate_facts: true
-      when: stat_exec.stat.exists == true
-
     - name: Fetch fileToSync.
       fetch: 
         src: "{{ fileToSync }}"
         dest: "{{ tmp_local_path }}"
         validate_checksum: false
         flat: true
-      when: stat_exec.stat.exists == true
+      when: stat_exec.stat.exists == true and hostvars['DUMMY_HOLDER']['file_founded_somewhere'] == false
+      
+    - name: Set information about fileToSync presence to DUMMY_HOLDER.
+      set_fact:
+        file_founded_somewhere: true
+      delegate_to: DUMMY_HOLDER
+      delegate_facts: true
+      when: stat_exec.stat.exists == true and hostvars['DUMMY_HOLDER']['file_founded_somewhere'] == false
 
   tasks:
     - name: Assert that fileToSync was founded or finish play if not.

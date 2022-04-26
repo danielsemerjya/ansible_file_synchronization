@@ -96,6 +96,20 @@ class Tester(unittest.TestCase):
             assert host3.check_is_file_exists('/tmp/foo') == True
             assert host4.check_is_file_exists('/tmp/foo') == True
 
+    def test_seven_hosts_two_files(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2, DockerContainerHost() as host3, DockerContainerHost() as host4, DockerContainerHost() as host5, DockerContainerHost() as host6, DockerContainerHost() as host7:
+            host1.execute('/bin/sh -c "echo content > /tmp/foo"')
+            host4.execute('/bin/sh -c "echo content > /tmp/foo"')
+            run_playbook([host1, host2, host3, host4, host5, host6, host7], '/tmp/foo')
+            assert host1.check_is_file_exists('/tmp/foo') == True
+            assert host2.check_is_file_exists('/tmp/foo') == True
+            assert host3.check_is_file_exists('/tmp/foo') == True
+            assert host4.check_is_file_exists('/tmp/foo') == True
+            assert host5.check_is_file_exists('/tmp/foo') == True
+            assert host6.check_is_file_exists('/tmp/foo') == True
+            assert host7.check_is_file_exists('/tmp/foo') == True
+
+
 
 if __name__ == '__main__':
     unittest.main()
