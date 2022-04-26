@@ -4,7 +4,6 @@ import unittest
 
 import threading
 import datetime
-import time
 
 class DockerContainerHost(object):
     def __init__(self):
@@ -47,45 +46,56 @@ def run_playbook(hosts, filePath) -> None:
 
 class Tester(unittest.TestCase):
     # TODO add more tests, for each path in the synchronize_file.yml
-    # def test_two_hosts_one_file(self):
-    #     with DockerContainerHost() as host1, DockerContainerHost() as host2:
-    #         host1.execute('/bin/sh -c "echo content > /tmp/foo"')
-    #         run_playbook([host1, host2], '/tmp/foo')
-    #         # TODO write checks that verify playbook synchronized file
-    #         assert host1.check_is_file_exists('/tmp/foo') == True
-    #         assert host2.check_is_file_exists('/tmp/foo') == True
+    def test_two_hosts_one_file(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2:
+            host1.execute('/bin/sh -c "echo content > /tmp/foo"')
+            run_playbook([host1, host2], '/tmp/foo')
+            # TODO write checks that verify playbook synchronized file
+            assert host1.check_is_file_exists('/tmp/foo') == True
+            assert host2.check_is_file_exists('/tmp/foo') == True
     
-    # def test_two_hosts_two_files(self):
-    #     with DockerContainerHost() as host1, DockerContainerHost() as host2:
-    #         host1.execute('/bin/sh -c "echo content > /tmp/foo"')
-    #         host2.execute('/bin/sh -c "echo content > /tmp/foo"')
-    #         run_playbook([host1, host2], '/tmp/foo')
-    #         assert host1.check_is_file_exists('/tmp/foo') == True
-    #         assert host2.check_is_file_exists('/tmp/foo') == True
-            
-    def test_four_host_one_file(self):
-        with DockerContainerHost() as host1, DockerContainerHost() as host2, DockerContainerHost() as host3, DockerContainerHost() as host4:
+    def test_two_hosts_two_files(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2:
+            host1.execute('/bin/sh -c "echo content > /tmp/foo"')
             host2.execute('/bin/sh -c "echo content > /tmp/foo"')
+            run_playbook([host1, host2], '/tmp/foo')
+            assert host1.check_is_file_exists('/tmp/foo') == True
+            assert host2.check_is_file_exists('/tmp/foo') == True
+
+    def test_two_hosts_no_file(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2:
+            try:
+                run_playbook([host1, host2], '/tmp/foo')
+            except:
+                pass
+            else:
+                raise Exception("Playbook should fail if file does not exist")
+
+    def test_two_hosts_one_file_without_playbook(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2:
+            host1.execute('/bin/sh -c "echo content > /tmp/foo"')
+            assert host1.check_is_file_exists('/tmp/foo') == True
+            assert host2.check_is_file_exists('/tmp/foo') == False
+
+    def test_four_hosts_one_file(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2, DockerContainerHost() as host3, DockerContainerHost() as host4:
+            host3.execute('/bin/sh -c "echo content > /tmp/foo"')
             run_playbook([host1, host2, host3, host4], '/tmp/foo')
             assert host1.check_is_file_exists('/tmp/foo') == True
             assert host2.check_is_file_exists('/tmp/foo') == True
             assert host3.check_is_file_exists('/tmp/foo') == True
             assert host4.check_is_file_exists('/tmp/foo') == True
 
-    # def test_two_hosts_one_file_without_playbook(self):
-    #     with DockerContainerHost() as host1, DockerContainerHost() as host2:
-    #         host1.execute('/bin/sh -c "echo content > /tmp/foo"')
-    #         assert host1.check_is_file_exists('/tmp/foo') == True
-    #         assert host2.check_is_file_exists('/tmp/foo') == False
+    def test_four_hosts_two_files(self):
+        with DockerContainerHost() as host1, DockerContainerHost() as host2, DockerContainerHost() as host3, DockerContainerHost() as host4:
+            host1.execute('/bin/sh -c "echo content > /tmp/foo"')
+            host4.execute('/bin/sh -c "echo content > /tmp/foo"')
+            run_playbook([host1, host2, host3, host4], '/tmp/foo')
+            assert host1.check_is_file_exists('/tmp/foo') == True
+            assert host2.check_is_file_exists('/tmp/foo') == True
+            assert host3.check_is_file_exists('/tmp/foo') == True
+            assert host4.check_is_file_exists('/tmp/foo') == True
 
-    # def test_two_hosts_no_file(self):
-    #     with DockerContainerHost() as host1, DockerContainerHost() as host2:
-    #         try:
-    #             run_playbook([host1, host2], '/tmp/foo')
-    #         except:
-    #             pass
-    #         else:
-    #             raise Exception("Playbook should fail if file does not exist")
 
 if __name__ == '__main__':
     unittest.main()

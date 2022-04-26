@@ -1,112 +1,61 @@
 ---
-# TODO: implement synchronization logic
-- name: Create group 'remote_servers'
+- name: Synchronize fileToSync
   hosts: all
-  tasks:
-    - name: Add host
-      add_host: 
-        hostname: "{{ item }}"
-        groups: remote_servers
-      with_inventory_hostnames:
-        - all
-      run_once: true
+  vars:
+    - tmp_local_path: "{{ playbook_dir }}/{{ fileToSync}}"
+    - file_presence: false
 
-- name: Check is "File To Sync" in any remote machine
-  hosts: all
-  serial: 1
   pre_tasks:
     - assert:
         that:
           - fileToSync is defined
 
-  tasks:
-    - name: Get stat of "File To Sync"
-      stat:
-        path: "{{ fileToSync }}"
-      register: stat
-
-    - name: Set information about fileToSync presence
-      set_fact:
-        file_presence: true
-      when: stat.stat.exists == true
-
-    - name: Set information about file absence
-      set_fact:
-        file_presence: false
-      when: stat.stat.exists == false
-
-    # - name: Delegate information about founded fileToSync to DUMMY
-    #   set_fact:
-    #     file_founded: true
-    #     file_holder_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | string }}"
-    #   delegate_to: DUMMY
-    #   when: stat.stat.exists == true
-
-    - name: Add dummy host for variable holding
+    - name: Add dummy host for variable holding.
       add_host:
         name: "DUMMY_HOLDER"
-        file_holder_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | string }}"
-      when: stat.stat.exists == true
+        file_founded_somewhere: false
+      run_once: true
 
-    - debug:
-        msg: " FIRST : {{ hostvars['DUMMY_HOLDER']['file_holder_ip'] }} "
-      when: stat.stat.exists == true
+    - name: Clear tmp directory.
+      local_action: file path="{{ tmp_local_path }}" state=absent
+      run_once: true
 
-- name: Assert that "File To Sync" was founded 
-  hosts: localhost
-  gather_facts: false
-  tasks:
-    - name: Assert that "File To Sync" was founded or finish play if not.
-      assert:
-        that: '"DUMMY_HOLDER" in hostvars'
-        fail_msg: '"File To Sync" was not founded on any host.'
-        success_msg: '"File To Sync" was founded.'
+    - name: Get stat of fileToSync
+      stat:
+        path: "{{ fileToSync }}"
+      register: stat_exec
 
-    # - debug:
-    #     msg: " THIS IS WHERE FileToSync ARE STORED: {{ hostvars['DUMMY_HOLDER']['file_holder_ip'] }} "
+    - name: Set information about fileToSync presence.
+      set_fact:
+        file_presence: true
+      when: stat_exec.stat.exists == true
 
-- name: Generate SSH keys
-  hosts: remote_servers
-  serial: 1
-  gather_facts: true
-  tasks:
-    - name: SSH KeyGen command
-      shell: > 
-        ssh-keygen -q -b 2048 -t rsa -N "" -C "creating SSH" -f ~/.ssh/id_rsa
-        creates="~/.ssh/id_rsa"
+    - name: Set information about fileToSync presence to DUMMY_HOLDER.
+      set_fact:
+        file_founded_somewhere: true
+      delegate_to: DUMMY_HOLDER
+      delegate_facts: true
+      when: stat_exec.stat.exists == true
 
-    - name: Fetch the keyfile from the node to master
+    - name: Fetch fileToSync.
       fetch: 
-        src: "~/.ssh/id_rsa.pub"
-        dest: "{{ playbook_dir }}/tmp/buffer/{{inventory_hostname}}-id_rsa.pub"
+        src: "{{ fileToSync }}"
+        dest: "{{ tmp_local_path }}"
         validate_checksum: false
         flat: true
+      when: stat_exec.stat.exists == true
 
-- name: Exchange SSH Keys between servers
-  hosts: remote_servers
-  gather_facts: true
   tasks:
-    - name: Add keys to authorized_keys
-      authorized_key:
-        user: root
-        state: present
-        key: "{{ lookup('file','{{ playbook_dir }}/tmp/buffer/{{item}}-id_rsa.pub')}}"
-      when: "{{ item != inventory_hostname }}"
-      with_items: 
-        - "{{ groups['remote_servers'] }}"
-        
-    - name: Restart sshd
-      shell:
-        cmd: "/etc/init.d/sshd restart"
+    - name: Assert that fileToSync was founded or finish play if not.
+      assert:
+        that: hostvars['DUMMY_HOLDER']['file_founded_somewhere']
+        fail_msg: '"File To Sync" was not founded on any host.'
+        success_msg: '"File To Sync" was founded.'
+      run_once: true
 
-- name: Synchronize 
-  hosts: remote_servers
-  gather_facts: true
-  tasks:
-    - name: Generic question with multiple different responses
-      remote_user: root
-      expect:
-        command: "rsync -avzh root@{{ hostvars['DUMMY_HOLDER']['file_holder_ip'] | string }}:{{ fileToSync }} {{ fileToSync }}"
-        responses:
-          'Are you sure you want to continue connecting (yes/no/[fingerprint])?': 'yes'
-      when: not file_presence
+  post_tasks:
+    - name: Copy fileToSync to servers.
+      copy:
+        src: "{{ tmp_local_path }}"
+        dest: "{{ fileToSync }}"
+      when: file_presence == false
